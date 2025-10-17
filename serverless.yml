@@ -1,0 +1,45 @@
+service: appointments-service
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: us-east-1
+  environment:
+    RABBITMQ_URL: amqp://guest:guest@localhost:5672
+    DB_USER: ${env:DB_USER}
+    DB_PASS: ${env:DB_PASS}
+    DB_NAME: rimac_db
+
+functions:
+  createAppointment:
+    handler: src/controllers/createAppointment.handler
+    events:
+      - httpApi:
+          path: /appointments
+          method: post
+
+  getAppointments:
+    handler: src/controllers/getAppointments.getAppointments
+    events:
+      - http:
+          path: appointments/{insuredId}  
+          method: get
+
+  processPE:
+    handler: src/consumers/appointmentConsumerPE.handler
+    events:
+      - rabbitmq:
+          queue: appointments_pe
+          exchange: appointments_topic/PE
+          routingKey: PE
+
+  processCL:
+    handler: src/consumers/appointmentConsumerCL.handler
+    events:
+      - rabbitmq:
+          queue: appointments_cl
+          exchange: appointments_topic/CL
+          routingKey: CL
+
+

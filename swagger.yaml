@@ -1,0 +1,29 @@
+openapi: 3.0.1
+info:
+  title: Reto Rimac Local API
+  version: "0.1.0"
+paths:
+  /api/appointments:
+    post:
+      summary: Create appointment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                insuredId: { type: string }
+                scheduleId: { type: integer }
+                countryISO: { type: string }
+      responses:
+        '201': { description: Created }
+  /api/appointments/{insuredId}:
+    get:
+      parameters:
+        - name: insuredId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }

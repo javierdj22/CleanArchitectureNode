@@ -1,0 +1,43 @@
+{
+  "name": "rimac-backend-local",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/api/server.ts",
+    "test": "jest tests/smoke.test.ts --coverage",
+    "start": "node dist/api/server.js",
+    "build": "tsc -p tsconfig.json",
+    "consumer:pe": "ts-node src/consumers/appointment_pe.ts",
+    "consumer:cl": "ts-node src/consumers/appointment_cl.ts",
+    "consumers": "concurrently \"npm run consumer:pe\" \"npm run consumer:cl\"",
+    "lint": "eslint . --ext .ts"
+  },
+  "dependencies": {
+    "amqplib": "^0.10.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "mssql": "^9.3.2",
+    "swagger-ui-express": "^5.0.1",
+    "uuid": "^9.0.0",
+    "winston": "^3.18.3",
+    "yamljs": "^0.3.0"
+  },
+  "devDependencies": {
+    "@types/amqplib": "^0.10.7",
+    "@types/cors": "^2.8.13",
+    "@types/express": "^4.17.21",
+    "@types/jest": "^29.5.3",
+    "@types/mssql": "^9.1.8",
+    "@types/node": "^20.5.1",
+    "@types/swagger-ui-express": "^4.1.8",
+    "@types/uuid": "^9.0.2",
+    "@types/yamljs": "^0.2.34",
+    "concurrently": "^9.2.1",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.4.5",
+    "ts-node": "^10.9.1",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,31 +1,33 @@
-import amqp from 'amqplib';
-import dotenv from 'dotenv';
-dotenv.config();
+import { SNSClient, PublishCommand } from "@aws-sdk/client-sns";
 
-const RABBIT_URL = process.env.RABBITMQ_URL || 'amqp://guest:guest@localhost:5672';
-const EXCHANGE = 'appointments_topic';
-const QUEUE_PE = 'appointments_pe';
-const QUEUE_CL = 'appointments_cl';
-
-let channel: amqp.Channel | null = null;
-
-export async function initQueues() {
-  const conn = await amqp.connect(RABBIT_URL);
-  channel = await conn.createChannel();
-  await channel.assertExchange(EXCHANGE, 'topic', { durable: true });
-  await channel.assertQueue(QUEUE_PE, { durable: true });
-  await channel.assertQueue(QUEUE_CL, { durable: true });
-  await channel.bindQueue(QUEUE_PE, EXCHANGE, 'PE');
-  await channel.bindQueue(QUEUE_CL, EXCHANGE, 'CL');
-  console.log('✅ RabbitMQ exchange and queues ready');
-}
+const snsClient = new SNSClient({ region: process.env.AWS_REGION });
 
 export async function publishAppointment(payload: any) {
-  if (!channel) {
-    await initQueues();
+  try {
+    // Determina el topic según el país
+    const topicArn =
+      payload.countryISO === "PE"
+        ? process.env.SNS_TOPIC_PE_ARN
+        : payload.countryISO === "CL"
+        ? process.env.SNS_TOPIC_CL_ARN
+        : process.env.SNS_TOPIC_GLOBAL_ARN;
+
+    if (!topicArn) {
+      throw new Error(`No se encontró un Topic ARN válido para ${payload.countryISO}`);
+    }
+
+    const command = new PublishCommand({
+      TopicArn: topicArn,
+      Message: JSON.stringify(payload),
+      MessageAttributes: {
+        countryISO: { DataType: "String", StringValue: payload.countryISO },
+      },
+    });
+
+    const result = await snsClient.send(command);
+    console.log(`✅ SNS publicado (${payload.countryISO}) → MessageId: ${result.MessageId}`);
+  } catch (error) {
+    console.error("❌ Error publicando en SNS:", error);
+    throw error;
   }
-  const buffer = Buffer.from(JSON.stringify(payload));
-  const key = payload.countryISO || 'PE';
-  channel!.publish(EXCHANGE, key, buffer, { persistent: true });
-  console.log('Published appointment to exchange', key, payload.requestId);
 }

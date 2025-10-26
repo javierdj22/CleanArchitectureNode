@@ -1,0 +1,118 @@
+service: appointments-service-consumers
+frameworkVersion: '3'
+
+custom:
+  accountId: ${env:AWS_ACCOUNT_ID, '615645510092'}
+  unique: ${env:UNIQUE, '001'}
+  esbuild:
+    bundle: true
+    minify: false
+    sourcemap: true
+    target: node18
+    platform: node
+    external: []
+
+plugins:
+  - serverless-esbuild
+  - serverless-dotenv-plugin
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: ${opt:region, 'us-east-1'}
+  stage: ${opt:stage, 'dev'}
+  memorySize: 256
+  timeout: 25
+  profile: deploy-local
+  environment:
+    ACCOUNT_ID: ${self:custom.accountId}
+    UNIQUE: ${self:custom.unique}
+    STAGE: ${opt:stage, 'dev'}
+    DYNAMODB_TABLE_GLOBAL: ${env:DYNAMODB_TABLE_GLOBAL}
+    DYNAMODB_TABLE_PE: ${env:DYNAMODB_TABLE_PE}
+    DYNAMODB_TABLE_CL: ${env:DYNAMODB_TABLE_CL}
+    INSUREDS_TABLE: ${env:INSUREDS_TABLE}
+
+  # <<<<--- Agregado: permisos IAM para DynamoDB
+  iamRoleStatements:
+  - Effect: "Allow"
+    Action:
+      - dynamodb:GetItem
+      - dynamodb:PutItem
+      - dynamodb:Scan
+      - dynamodb:Query
+      - dynamodb:UpdateItem
+    Resource:
+      - arn:aws:dynamodb:${self:provider.region}:${self:custom.accountId}:table/${self:provider.environment.DYNAMODB_TABLE_GLOBAL}
+      - arn:aws:dynamodb:${self:provider.region}:${self:custom.accountId}:table/${self:provider.environment.DYNAMODB_TABLE_PE}
+      - arn:aws:dynamodb:${self:provider.region}:${self:custom.accountId}:table/${self:provider.environment.DYNAMODB_TABLE_CL}
+      - arn:aws:dynamodb:${self:provider.region}:${self:custom.accountId}:table/${self:provider.environment.INSUREDS_TABLE}
+
+functions:
+  processPE:
+    handler: src/consumers/appointmentConsumerPE.default
+    environment:
+      APPOINTMENTS_PE_TABLE: ${env:DYNAMODB_TABLE_PE}
+      APPOINTMENTS_TABLE: ${env:DYNAMODB_TABLE_GLOBAL}
+      SNS_TOPIC_ARN: ${env:SNS_TOPIC_PE_ARN}
+    events:
+      - sns:
+          arn: ${env:SNS_TOPIC_PE_ARN}
+          filterPolicy:
+            countryISO:
+              - PE
+
+  processCL:
+    handler: src/consumers/appointmentConsumerCL.default
+    environment:
+      APPOINTMENTS_CL_TABLE: ${env:DYNAMODB_TABLE_CL}
+      APPOINTMENTS_TABLE: ${env:DYNAMODB_TABLE_GLOBAL}
+      SNS_TOPIC_ARN: ${env:SNS_TOPIC_CL_ARN}
+    events:
+      - sns:
+          arn: ${env:SNS_TOPIC_CL_ARN}
+          filterPolicy:
+            countryISO:
+              - CL
+
+resources:
+  Resources:
+    # Permisos SNS -> Lambda PE
+    ProcessPEInvokePermission:
+      Type: AWS::Lambda::Permission
+      Properties:
+        FunctionName: !GetAtt ProcessPELambdaFunction.Arn
+        Action: lambda:InvokeFunction
+        Principal: sns.amazonaws.com
+        SourceArn: ${env:SNS_TOPIC_PE_ARN}
+
+    # Permisos SNS -> Lambda CL
+    ProcessCLInvokePermission:
+      Type: AWS::Lambda::Permission
+      Properties:
+        FunctionName: !GetAtt ProcessCLLambdaFunction.Arn
+        Action: lambda:InvokeFunction
+        Principal: sns.amazonaws.com
+        SourceArn: ${env:SNS_TOPIC_CL_ARN}
+
+    # Suscripciones SNS -> Lambdas
+    ProcessPESnsSubscription:
+      Type: AWS::SNS::Subscription
+      Properties:
+        TopicArn: ${env:SNS_TOPIC_PE_ARN}
+        Protocol: lambda
+        Endpoint: !GetAtt ProcessPELambdaFunction.Arn
+        FilterPolicy:
+          countryISO: ["PE"]
+      DependsOn:
+        - ProcessPEInvokePermission
+
+    ProcessCLSnsSubscription:
+      Type: AWS::SNS::Subscription
+      Properties:
+        TopicArn: ${env:SNS_TOPIC_CL_ARN}
+        Protocol: lambda
+        Endpoint: !GetAtt ProcessCLLambdaFunction.Arn
+        FilterPolicy:
+          countryISO: ["CL"]
+      DependsOn:
+        - ProcessCLInvokePermission

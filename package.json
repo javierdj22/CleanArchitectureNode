@@ -10,12 +10,24 @@
     "consumer:pe": "ts-node src/consumers/appointment_pe.ts",
     "consumer:cl": "ts-node src/consumers/appointment_cl.ts",
     "consumers": "concurrently \"npm run consumer:pe\" \"npm run consumer:cl\"",
-    "lint": "eslint . --ext .ts"
+    "lint": "eslint . --ext .ts",
+    "deploy": "node ./node_modules/serverless/bin/serverless.js deploy",
+    "clean": "rimraf .serverless node_modules/.cache",
+    "clean-sns": "node ./scripts/clean-sns.js",
+    "deploy:api:local": "npm run clean && node -r dotenv/config ./node_modules/serverless/bin/serverless.js deploy --config serverless.api.yml --aws-profile deploy-local --stage dev",
+    "deploy:consumers:local": "node -r dotenv/config ./node_modules/serverless/bin/serverless.js deploy --config serverless.consumers.yml --aws-profile deploy-local --stage dev",
+    "deploy:all:local": "npm run deploy:consumers:local && npm run deploy:api:local"
   },
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.917.0",
+    "@aws-sdk/client-sns": "^3.917.0",
+    "@aws-sdk/credential-providers": "^3.916.0",
+    "@aws-sdk/lib-dynamodb": "^3.917.0",
     "amqplib": "^0.10.3",
+    "aws-cdk-lib": "^2.221.0",
+    "aws-sdk": "^2.1692.0",
+    "constructs": "^10.4.2",
     "cors": "^2.8.5",
-    "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "mssql": "^9.3.2",
     "swagger-ui-express": "^5.0.1",
@@ -25,19 +37,43 @@
   },
   "devDependencies": {
     "@types/amqplib": "^0.10.7",
+    "@types/aws-lambda": "^8.10.156",
+    "@types/aws-sdk": "^0.0.42",
     "@types/cors": "^2.8.13",
     "@types/express": "^4.17.21",
     "@types/jest": "^29.5.3",
     "@types/mssql": "^9.1.8",
-    "@types/node": "^20.5.1",
+    "@types/node": "^20.19.23",
     "@types/swagger-ui-express": "^4.1.8",
     "@types/uuid": "^9.0.2",
     "@types/yamljs": "^0.2.34",
+    "aws-cdk": "^2.1031.0",
     "concurrently": "^9.2.1",
+    "dotenv": "^17.2.3",
     "jest": "^29.7.0",
+    "rimraf": "^6.0.1",
+    "serverless": "^3.40.0",
+    "serverless-dotenv-plugin": "^6.0.0",
+    "serverless-esbuild": "^1.55.1",
     "ts-jest": "^29.4.5",
-    "ts-node": "^10.9.1",
+    "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.9.3"
-  }
+  },
+  "description": "Reto Rimac - Local version (Express + TypeScript + RabbitMQ + SQL Server)",
+  "main": "jest.config.js",
+  "directories": {
+    "test": "tests"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/javierdj22/CleanArchitectureNode.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/javierdj22/CleanArchitectureNode/issues"
+  },
+  "homepage": "https://github.com/javierdj22/CleanArchitectureNode#readme"
 }

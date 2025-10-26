@@ -1,0 +1,84 @@
+service: appointments-service-api
+frameworkVersion: '3'
+
+plugins:
+  - serverless-esbuild
+  - serverless-dotenv-plugin
+
+custom:
+  accountId: ${env:ACCOUNT_ID, '615645510092'}
+  unique: ${env:UNIQUE, '001'}
+  esbuild:
+    bundle: true
+    minify: false
+    sourcemap: true
+    target: node18
+    platform: node
+    external: []
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: ${env:AWS_REGION, 'us-east-1'}
+  stage: ${opt:stage, 'dev'}
+  memorySize: 256
+  timeout: 25
+  profile: deploy-local  
+
+  environment:
+    ACCOUNT_ID: ${self:custom.accountId}
+    DYNAMODB_TABLE_GLOBAL: ${env:DYNAMODB_TABLE_GLOBAL, 'appointments'}
+    DYNAMODB_TABLE_PE: ${env:DYNAMODB_TABLE_PE, 'appointments_pe'}
+    DYNAMODB_TABLE_CL: ${env:DYNAMODB_TABLE_CL, 'appointments_cl'}
+    INSUREDS_TABLE: ${env:INSUREDS_TABLE, 'insureds'}
+
+    SNS_TOPIC_GLOBAL_ARN: ${env:SNS_TOPIC_GLOBAL_ARN}
+    SNS_TOPIC_PE_ARN: ${env:SNS_TOPIC_PE_ARN}
+    SNS_TOPIC_CL_ARN: ${env:SNS_TOPIC_CL_ARN}
+
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:Scan
+          Resource:
+            - arn:aws:dynamodb:${self:provider.region}:${self:custom.accountId}:table/${self:provider.environment.DYNAMODB_TABLE_GLOBAL}
+            - arn:aws:dynamodb:${self:provider.region}:${self:custom.accountId}:table/${self:provider.environment.DYNAMODB_TABLE_PE}
+            - arn:aws:dynamodb:${self:provider.region}:${self:custom.accountId}:table/${self:provider.environment.DYNAMODB_TABLE_CL}
+            - arn:aws:dynamodb:${self:provider.region}:${self:custom.accountId}:table/${self:provider.environment.INSUREDS_TABLE}
+
+        - Effect: Allow
+          Action:
+            - sns:Publish
+          Resource:
+            - ${self:provider.environment.SNS_TOPIC_GLOBAL_ARN}
+            - ${self:provider.environment.SNS_TOPIC_PE_ARN}
+            - ${self:provider.environment.SNS_TOPIC_CL_ARN}
+
+package:
+  patterns:
+    - "src/**/*"
+    - "package.json"
+    - "!node_modules/**"
+
+functions:
+  createAppointment:
+    handler: src/controllers/createAppointment.default
+    environment:
+      SNS_TOPIC_GLOBAL_ARN: ${env:SNS_TOPIC_GLOBAL_ARN}
+      SNS_TOPIC_PE_ARN: ${env:SNS_TOPIC_PE_ARN}
+      SNS_TOPIC_CL_ARN: ${env:SNS_TOPIC_CL_ARN}
+    events:
+      - httpApi:
+          path: /appointments
+          method: post
+
+  getAppointments:
+    handler: src/controllers/getAppointments.default
+    events:
+      - httpApi:
+          path: /appointments/{insuredId}
+          method: get

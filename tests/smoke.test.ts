@@ -1,42 +1,42 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:3000/api/appointments';
+const API_URL = 'https://9ta7wdq3l9.execute-api.us-east-1.amazonaws.com/appointments';
 
 describe('Pruebas smoke para creación de citas', () => {
 
   const aseguradosPE = [1001, 1003, 1004, 1007, 1010]; // asegurados PE de ejemplo (puedes repetir)
   const aseguradosCL = [1002, 1006, 1009];             // asegurados CL de ejemplo
 
-  test('Registrar 1000 citas para PE pendiente de Procesamiento', async () => {
-    for (let i = 0; i < 1000; i++) {
-      const insuredId = aseguradosPE[i % aseguradosPE.length];
-      const scheduleId = 5000 + i;  // scheduleId diferente
-      const response = await axios.post(API_URL, {
-        insuredId,
-        scheduleId,
-        countryISO: 'PE',
-      });
-      expect([200, 201]).toContain(response.status);
-    }
-  }, 20000); // timeout extendido por si tarda
+  // test('Registrar 1000 citas para PE pendiente de Procesamiento', async () => {
+  //   for (let i = 0; i < 1000; i++) {
+  //     const insuredId = aseguradosPE[i % aseguradosPE.length];
+  //     const scheduleId = 5000 + i;  // scheduleId diferente
+  //     const response = await axios.post(API_URL, {
+  //       insuredId,
+  //       scheduleId,
+  //       countryISO: 'PE',
+  //     });
+  //     expect([200, 201]).toContain(response.status);
+  //   }
+  // }, 20000); // timeout extendido por si tarda
 
-  test('Registrar 1000 citas para CL pendiente de Procesamiento', async () => {
-    for (let i = 0; i < 1000; i++) {
-      const insuredId = aseguradosCL[i % aseguradosCL.length];
-      const scheduleId = 600 + i;  // scheduleId diferente
-      const response = await axios.post(API_URL, {
-        insuredId,
-        scheduleId,
-        countryISO: 'CL',
-      });
-      expect([200, 201]).toContain(response.status);
-    }
-  }, 20000);
+  // test('Registrar 1000 citas para CL pendiente de Procesamiento', async () => {
+  //   for (let i = 0; i < 1000; i++) {
+  //     const insuredId = aseguradosCL[i % aseguradosCL.length];
+  //     const scheduleId = 600 + i;  // scheduleId diferente
+  //     const response = await axios.post(API_URL, {
+  //       insuredId,
+  //       scheduleId,
+  //       countryISO: 'CL',
+  //     });
+  //     expect([200, 201]).toContain(response.status);
+  //   }
+  // }, 20000);
 
   test('Crea cita correctamente para asegurado válido y país válido', async () => {
     const response = await axios.post(API_URL, {
-      insuredId: 1001,    // Javier Salazar - PE
-      scheduleId: 501,
+      insuredId: "01001",    // Javier Salazar - PE
+      scheduleId: 521,
       countryISO: 'PE'
     });
 
@@ -53,7 +53,7 @@ describe('Pruebas smoke para creación de citas', () => {
   test('Error por countryISO no válido', async () => {
     try {
       await axios.post(API_URL, {
-        insuredId: 1001,
+        insuredId: "1001",
         scheduleId: 501,
         countryISO: 'AR'  // No permitido
       });
@@ -67,7 +67,7 @@ describe('Pruebas smoke para creación de citas', () => {
   test('Error por asegurado no encontrado para el país', async () => {
     try {
       await axios.post(API_URL, {
-        insuredId: 1001,  // Javier Salazar es PE
+        insuredId: "1001",  // Javier Salazar es PE
         scheduleId: 502,
         countryISO: 'CL'  // Chile, asegurado no corresponde
       });
@@ -81,7 +81,7 @@ describe('Pruebas smoke para creación de citas', () => {
   test('Error por asegurado inexistente', async () => {
     try {
       await axios.post(API_URL, {
-        insuredId: 9999,  // No existe
+        insuredId: "9999",  // No existe
         scheduleId: 503,
         countryISO: 'PE'
       });

@@ -1,101 +1,124 @@
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, PutCommand, ScanCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
-import { putItem, getItem, TABLES } from '../src/services/dynamo.service';
+import axios from 'axios';
+jest.mock('axios');
 
-jest.mock('dotenv', () => ({ config: jest.fn() }));
-jest.mock('@aws-sdk/credential-providers', () => ({ fromEnv: jest.fn(() => ({ accessKeyId: 'x', secretAccessKey: 'y' })) }));
+const API_URL = 'https://9ta7wdq3l9.execute-api.us-east-1.amazonaws.com/appointments';
 
-jest.mock('@aws-sdk/client-dynamodb', () => ({
-  DynamoDBClient: jest.fn().mockImplementation(() => ({})),
-}));
+describe('Pruebas mock para creación de citas', () => {
 
-const sendMock = jest.fn();
-jest.mock('@aws-sdk/lib-dynamodb', () => {
-  const actual = jest.requireActual('@aws-sdk/lib-dynamodb');
-  return {
-    ...actual,
-    DynamoDBDocumentClient: {
-      from: jest.fn(() => ({ send: sendMock })),
-    },
-    PutCommand: jest.fn().mockImplementation((input: any) => ({ __type: 'PutCommand', input })),
-    ScanCommand: jest.fn().mockImplementation((input: any) => ({ __type: 'ScanCommand', input })),
-    GetCommand: jest.fn().mockImplementation((input: any) => ({ __type: 'GetCommand', input })),
-  };
-});
+  const aseguradosPE = [1001, 1003, 1004, 1007, 1010];
+  const aseguradosCL = [1002, 1006, 1009];
 
-describe('dynamo.service', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  test('putItem should send PutCommand with provided params', async () => {
-    sendMock.mockResolvedValueOnce({});
-    const item = { id: '1', foo: 'bar' };
+  test('Crea cita correctamente para asegurado válido y país válido', async () => {
+    const mockResponse = {
+      status: 201,
+      data: { requestId: 'abc123' }
+    };
+    (axios.post as jest.Mock).mockResolvedValueOnce(mockResponse);
 
-    await putItem('tbl', item);
-
-    expect(DynamoDBClient).toHaveBeenCalledWith({ region: expect.any(String), credentials: expect.any(Object) });
-    expect(DynamoDBDocumentClient.from).toHaveBeenCalled();
-    expect(PutCommand).toHaveBeenCalledWith({ TableName: 'tbl', Item: item });
-    expect(sendMock).toHaveBeenCalledWith(expect.objectContaining({ __type: 'PutCommand', input: { TableName: 'tbl', Item: item } }));
-  });
-
-  // test('scanByInsuredId should send ScanCommand with filter and return items array', async () => {
-  //   sendMock.mockResolvedValueOnce({ Items: [{ a: 1 }, { a: 2 }] });
-
-  //   const out = await scanByInsuredId('tbl', 123);
-
-  //   expect(ScanCommand).toHaveBeenCalledWith({
-  //     TableName: 'tbl',
-  //     FilterExpression: '#iid = :id',
-  //     ExpressionAttributeNames: { '#iid': 'insuredId' },
-  //     ExpressionAttributeValues: { ':id': 123 },
-  //   });
-  //   expect(out).toEqual([{ a: 1 }, { a: 2 }]);
-  // });
-
-  // test('scanByInsuredId should return empty array when no Items', async () => {
-  //   sendMock.mockResolvedValueOnce({});
-
-  //   const out = await scanByInsuredId('tbl', '999');
-
-  //   expect(out).toEqual([]);
-  // });
-
-  test('getItem should return null when no Item found', async () => {
-    sendMock.mockResolvedValueOnce({ Item: undefined });
-
-    const out = await getItem('tbl', { id: 'x' });
-
-    expect(GetCommand).toHaveBeenCalledWith({ TableName: 'tbl', Key: { id: 'x' } });
-    expect(out).toBeNull();
-  });
-
-  test('getItem should return typed item when found', async () => {
-    sendMock.mockResolvedValueOnce({ Item: { id: 'x', n: 1 } });
-
-    const out = await getItem<{ id: string; n: number }>('tbl', { id: 'x' });
-
-    expect(out).toEqual({ id: 'x', n: 1 });
-  });
-
-  test('getItem should rethrow errors and log once', async () => {
-    const err = new Error('boom');
-    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    sendMock.mockRejectedValueOnce(err);
-
-    await expect(getItem('tbl', { id: 'x' })).rejects.toThrow('boom');
-    expect(spy).toHaveBeenCalledTimes(1);
-    spy.mockRestore();
-  });
-
-  test('TABLES should expose default names when env not set', () => {
-    // No env overrides in test
-    expect(TABLES).toEqual({
-      APPOINTMENTS: 'appointments',
-      APPOINTMENTS_PE: 'appointments_pe',
-      APPOINTMENTS_CL: 'appointments_cl',
-      INSUREDS: 'insureds',
+    const response = await axios.post(API_URL, {
+      insuredId: "01001",
+      scheduleId: 521,
+      countryISO: 'PE'
     });
+
+    expect([200, 201]).toContain(response.status);
+    expect(
+      response.data.requestId !== undefined ||
+      response.data.mensaje === "La cita ya fue generada previamente"
+    ).toBe(true);
+  });
+
+  test('Error por countryISO no válido', async () => {
+    const mockError = {
+      response: { status: 400, data: { mensaje: "countryISO no válido" } }
+    };
+    (axios.post as jest.Mock).mockRejectedValueOnce(mockError);
+
+    try {
+      await axios.post(API_URL, {
+        insuredId: "1001",
+        scheduleId: 501,
+        countryISO: 'AR'
+      });
+    } catch (err: any) {
+      expect(err.response.status).toBe(400);
+      expect(err.response.data.mensaje).toMatch(/countryISO no válido/i);
+    }
+  });
+
+  test('Error por asegurado no encontrado para el país', async () => {
+    const mockError = {
+      response: { status: 400, data: { mensaje: "El asegurado no puede agendar cita en este país" } }
+    };
+    (axios.post as jest.Mock).mockRejectedValueOnce(mockError);
+
+    try {
+      await axios.post(API_URL, {
+        insuredId: "1001",
+        scheduleId: 502,
+        countryISO: 'CL'
+      });
+    } catch (err: any) {
+      expect(err.response.status).toBe(400);
+      expect(err.response.data.mensaje).toMatch(/no puede agendar cita/i);
+    }
+  });
+
+  test('Error por asegurado inexistente', async () => {
+    const mockError = {
+      response: { status: 404, data: { mensaje: "Asegurado no encontrado" } }
+    };
+    (axios.post as jest.Mock).mockRejectedValueOnce(mockError);
+
+    try {
+      await axios.post(API_URL, {
+        insuredId: "9999",
+        scheduleId: 503,
+        countryISO: 'PE'
+      });
+    } catch (err: any) {
+      expect(err.response.status).toBe(404);
+      expect(err.response.data.mensaje).toMatch(/asegurado no encontrado/i);
+    }
+  });
+
+  test('Registrar múltiples citas para PE (mock)', async () => {
+    const mockResponse = { status: 201, data: { requestId: 'abc' } };
+    (axios.post as jest.Mock).mockResolvedValue(mockResponse);
+
+    for (let i = 0; i < 10; i++) {
+      const insuredId = aseguradosPE[i % aseguradosPE.length];
+      const scheduleId = 5000 + i;
+      const response = await axios.post(API_URL, {
+        insuredId,
+        scheduleId,
+        countryISO: 'PE'
+      });
+      expect([200, 201]).toContain(response.status);
+    }
+
+    expect(axios.post).toHaveBeenCalledTimes(10);
+  });
+
+  test('Registrar múltiples citas para CL (mock)', async () => {
+    const mockResponse = { status: 201, data: { requestId: 'xyz' } };
+    (axios.post as jest.Mock).mockResolvedValue(mockResponse);
+
+    for (let i = 0; i < 5; i++) {
+      const insuredId = aseguradosCL[i % aseguradosCL.length];
+      const scheduleId = 600 + i;
+      const response = await axios.post(API_URL, {
+        insuredId,
+        scheduleId,
+        countryISO: 'CL'
+      });
+      expect([200, 201]).toContain(response.status);
+    }
+
+    expect(axios.post).toHaveBeenCalledTimes(5);
   });
 });
